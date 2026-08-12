@@ -1,7 +1,13 @@
 {
+  "name": "do-server",
+  "version": "1.0.0",
+  "description": "Device Owner Server",
+  "main": "server.js",
   "dependencies": {
-    "body-parser": "^2.3.0",
-    "express": "^5.2.1",
-    "multer": "^2.2.0"
+    "express": "^4.18.2",
+    "ws": "^8.13.0"
+  },
+  "scripts": {
+    "start": "node server.js"
   }
 }
