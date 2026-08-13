@@ -201,6 +201,28 @@
         .flex-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
         .flex-row input { flex: 1; }
 
+        /* --- App List Specific Styles --- */
+        .app-list-area {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #0f172a;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-top: 10px;
+            display: none;
+        }
+        .app-item {
+            padding: 8px;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .app-item:hover { background: #1e293b; }
+        .app-item:last-child { border-bottom: none; }
+        .app-name-text { font-size: 0.85rem; font-weight: 600; color: var(--accent); }
+        .app-pkg-text { font-size: 0.7rem; color: var(--text-dim); font-family: monospace; }
+        .app-type-tag { font-size: 0.6rem; color: #f59e0b; margin-top: 2px; }
+
     </style>
 </head>
 <body>
@@ -264,7 +286,11 @@
                         <input type="text" id="targetPackage" placeholder="com.package.name">
                         <button onclick="sendCommand('list_apps')">List</button>
                     </div>
-                    <div class="btn-toggle" style="margin-bottom: 8px;">
+
+                    <!-- Scrollable App List -->
+                    <div id="appListArea" class="app-list-area"></div>
+
+                    <div class="btn-toggle" style="margin-bottom: 8px; margin-top: 10px;">
                         <button style="flex:1" onclick="sendCommand('hide_app', {packageName: document.getElementById('targetPackage').value, hidden: true})">Hide</button>
                         <button style="flex:1" onclick="sendCommand('hide_app', {packageName: document.getElementById('targetPackage').value, hidden: false})">Unhide</button>
                     </div>
@@ -516,6 +542,34 @@
             }
         }
 
+        function renderAppsList(apps) {
+            const listEl = document.getElementById('appListArea');
+            if (!apps || !Array.isArray(apps)) return;
+
+            listEl.style.display = 'block';
+            listEl.innerHTML = '';
+
+            apps.sort((a, b) => a.name.localeCompare(b.name));
+
+            apps.forEach(app => {
+                const div = document.createElement('div');
+                div.className = 'app-item';
+                div.onclick = () => {
+                    document.getElementById('targetPackage').value = app.package;
+                    div.style.background = 'rgba(56, 189, 248, 0.2)';
+                    setTimeout(() => div.style.background = '', 200);
+                };
+
+                const type = app.isSystem ? 'System' : 'Third-party';
+                div.innerHTML = `
+                    <div class="app-name-text">${app.name}</div>
+                    <div class="app-pkg-text">${app.package}</div>
+                    <div class="app-type-tag">${type}</div>
+                `;
+                listEl.appendChild(div);
+            });
+        }
+
         async function fetchDeviceData() {
             const deviceId = document.getElementById('deviceSelect').value;
             if (!deviceId) return;
@@ -538,6 +592,11 @@
                     if (document.getElementById('logs').innerText !== newLog) {
                         document.getElementById('logs').innerText = newLog;
                         document.getElementById('lastUpdated').innerText = "Updated: " + new Date().toLocaleTimeString();
+
+                        // Update app list if present
+                        if (data.response && data.response.apps) {
+                            renderAppsList(data.response.apps);
+                        }
                     }
 
                     if (!isCoolingDown) {
@@ -566,6 +625,11 @@
         async function sendCommand(action, params = {}) {
             const deviceId = document.getElementById('deviceSelect').value;
             if (!deviceId) return alert("Select a device!");
+
+            if (action === 'list_apps') {
+                document.getElementById('appListArea').style.display = 'block';
+                document.getElementById('appListArea').innerHTML = '<div style="padding:10px; text-align:center; color:var(--accent);">Fetching...</div>';
+            }
 
             lastCommandTimestamp = Date.now();
             try {
