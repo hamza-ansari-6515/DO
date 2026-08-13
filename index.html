@@ -145,7 +145,8 @@
             border-radius: 8px;
             background: #000;
             margin-top: 10px;
-            aspect-ratio: 9/16;
+            aspect-ratio: auto;
+            max-height: 70vh;
             object-fit: contain;
             border: 1px solid var(--border);
         }
@@ -252,30 +253,22 @@
 
         <div id="controls" style="display: none;">
             <div class="grid">
-                <!-- Live Monitoring -->
+                <!-- Live Monitoring & Camera -->
                 <div class="card">
-                    <h2>Live View</h2>
-                    <div class="btn-toggle">
-                        <button class="action" style="flex:1" onclick="sendCommand('start_screen_capture')">Screen Start</button>
-                        <button style="flex:1" onclick="sendCommand('stop_screen_capture')">Screen Stop</button>
+                    <h2>Live View & Camera</h2>
+                    <div style="margin-bottom: 15px;">
+                        <label>Select Camera Source</label>
+                        <select id="cameraIdSelect" style="margin-top:5px; margin-bottom:10px;">
+                            <option value="0">Back Camera (0)</option>
+                            <option value="1">Front Camera (1)</option>
+                            <option value="2">Other (2)</option>
+                        </select>
+                        <div class="btn-toggle">
+                            <button class="action" style="flex:1" onclick="sendCommand('live_camera', {enabled: true, cameraId: document.getElementById('cameraIdSelect').value})">Start Feed</button>
+                            <button style="flex:1" onclick="sendCommand('live_camera', {enabled: false})">Stop Feed</button>
+                        </div>
                     </div>
                     <img id="liveScreen" class="live-screen" src="" alt="Stream Offline" />
-                </div>
-
-                <!-- Live Camera Control -->
-                <div class="card">
-                    <h2>Live Camera Control</h2>
-                    <label>Select Camera</label>
-                    <select id="cameraIdSelect" style="margin-bottom:10px; margin-top:5px">
-                        <option value="0">Back Camera (0)</option>
-                        <option value="1">Front Camera (1)</option>
-                        <option value="2">Other (2)</option>
-                    </select>
-                    <div class="btn-toggle">
-                        <button class="action" style="flex:1" onclick="sendCommand('live_camera', {enabled: true, cameraId: document.getElementById('cameraIdSelect').value})">Start Camera</button>
-                        <button style="flex:1" onclick="sendCommand('live_camera', {enabled: false})">Stop Camera</button>
-                    </div>
-                    <p style="font-size: 0.7rem; color: var(--text-dim); margin-top: 10px;">Camera stream will replace Screen view above.</p>
                 </div>
 
                 <!-- Immediate Actions -->
@@ -665,7 +658,7 @@
 
         setInterval(loadDevices, 10000);
         setInterval(fetchDeviceData, 4000);
-        setInterval(updateLiveStream, 500);
+        setInterval(updateLiveStream, 200); // Faster polling for smoother UI
         loadDevices();
     </script>
 </body>
