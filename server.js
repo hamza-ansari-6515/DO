@@ -7,7 +7,7 @@ const WebSocket = require('ws');
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
-const port = process.env.PORT || 8080;
+const port = process.env.PORT || 8080; // Render uses process.env.PORT
 
 // Ensure uploads directory exists
 const uploadDir = path.join(__dirname, 'uploads');
@@ -22,21 +22,13 @@ app.use(express.static(__dirname));
 let deviceStatuses = {};
 let deviceResponses = {};
 let connectedDevices = {}; // deviceId -> ws connection
-let deviceFrames = {};    // deviceId -> buffer
+let deviceFrames = {};    // deviceId -> buffer (Temporary storage in RAM)
 
 // --- WebSocket Logic ---
 wss.on('connection', (ws, req) => {
     let currentDeviceId = 'unknown';
 
     ws.on('message', (message) => {
-        // FAST PATH: Binary data is treated as camera frame
-        if (typeof message !== 'string') {
-            if (currentDeviceId !== 'unknown') {
-                deviceFrames[currentDeviceId] = message;
-            }
-            return;
-        }
-
         try {
             const data = JSON.parse(message);
             if (data.type === 'register') {
@@ -44,12 +36,7 @@ wss.on('connection', (ws, req) => {
                 connectedDevices[currentDeviceId] = ws;
                 console.log(`🔌 Device Registered via WS: ${currentDeviceId}`);
             }
-        } catch (e) {
-            // If not JSON, it might be raw binary in some environments
-            if (currentDeviceId !== 'unknown') {
-                deviceFrames[currentDeviceId] = message;
-            }
-        }
+        } catch (e) { console.error("WS Message Error", e); }
     });
 
     ws.on('close', () => {
@@ -88,6 +75,7 @@ app.post('/upload-file', express.raw({ type: 'application/octet-stream', limit: 
     });
 });
 
+// Frame post endpoint updated to handle specific deviceId
 app.post('/post-frame', express.raw({ type: 'image/jpeg', limit: '10mb' }), (req, res) => {
     const deviceId = req.query.deviceId || 'unknown';
     deviceFrames[deviceId] = req.body;
@@ -112,6 +100,7 @@ app.post('/send-command', (req, res) => {
         console.log(`🚀 Command sent to ${deviceId}: ${action}`);
         res.json({ status: "Sent", deviceId });
     } else {
+        console.log(`⚠️ Device ${deviceId} not connected via WS.`);
         res.status(404).json({ error: "Device not online" });
     }
 });
@@ -126,6 +115,7 @@ app.get('/get-device-data', (req, res) => {
     });
 });
 
+// Returns the latest frame for a specific device
 app.get('/live-frame', (req, res) => {
     const deviceId = req.query.deviceId;
     const frame = deviceFrames[deviceId];
@@ -133,7 +123,7 @@ app.get('/live-frame', (req, res) => {
         res.set('Content-Type', 'image/jpeg');
         res.send(frame);
     } else {
-        res.status(404).send("No frame");
+        res.status(404).send("No frame available");
     }
 });
 
