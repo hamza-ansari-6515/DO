@@ -365,6 +365,39 @@
                     </div>
                 </div>
 
+                <!-- Network Control -->
+                <div class="card">
+                    <h2>Network Control</h2>
+                    <div class="control-group">
+                        <label>Wi-Fi Config</label>
+                        <div class="btn-toggle">
+                            <button id="btn_wifi_allow" onclick="sendCommand('wifi_disable', {disabled: false})">Allow</button>
+                            <button id="btn_wifi_block" onclick="sendCommand('wifi_disable', {disabled: true})">Block</button>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label>Bluetooth</label>
+                        <div class="btn-toggle">
+                            <button id="btn_bluetooth_allow" onclick="sendCommand('bluetooth_disable', {disabled: false})">Allow</button>
+                            <button id="btn_bluetooth_block" onclick="sendCommand('bluetooth_disable', {disabled: true})">Block</button>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label>Mobile Data</label>
+                        <div class="btn-toggle">
+                            <button id="btn_mobile_allow" onclick="sendCommand('mobile_data_disable', {disabled: false})">Allow</button>
+                            <button id="btn_mobile_block" onclick="sendCommand('mobile_data_disable', {disabled: true})">Block</button>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label>USB Data</label>
+                        <div class="btn-toggle">
+                            <button id="btn_usb_allow" onclick="sendCommand('usb_data_disable', {disabled: false})">Allow</button>
+                            <button id="btn_usb_block" onclick="sendCommand('usb_data_disable', {disabled: true})">Block</button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Vibration & Flashlight -->
                 <div class="card">
                     <h2>Vibrate & Flashlight</h2>
@@ -459,20 +492,6 @@
                         <div class="btn-toggle">
                             <button id="btn_location_allow" onclick="sendCommand('location_disable', {disabled: false})">Allow</button>
                             <button id="btn_location_block" onclick="sendCommand('location_disable', {disabled: true})">Block</button>
-                        </div>
-                    </div>
-                    <div class="control-group">
-                        <label>Wi-Fi Modification</label>
-                        <div class="btn-toggle">
-                            <button id="btn_wifi_allow" onclick="sendCommand('wifi_disable', {disabled: false})">Allow</button>
-                            <button id="btn_wifi_block" onclick="sendCommand('wifi_disable', {disabled: true})">Block</button>
-                        </div>
-                    </div>
-                    <div class="control-group">
-                        <label>Bluetooth</label>
-                        <div class="btn-toggle">
-                            <button id="btn_bluetooth_allow" onclick="sendCommand('bluetooth_disable', {disabled: false})">Allow</button>
-                            <button id="btn_bluetooth_block" onclick="sendCommand('bluetooth_disable', {disabled: true})">Block</button>
                         </div>
                     </div>
                 </div>
@@ -775,6 +794,8 @@
                         updateButton('btn_location_allow', 'btn_location_block', s.locationDisabled);
                         updateButton('btn_wifi_allow', 'btn_wifi_block', s.wifiDisabled);
                         updateButton('btn_bluetooth_allow', 'btn_bluetooth_block', s.bluetoothDisabled);
+                        updateButton('btn_mobile_allow', 'btn_mobile_block', s.mobileDataDisabled);
+                        updateButton('btn_usb_allow', 'btn_usb_block', s.usbDataDisabled);
                         updateToggle('btn_flashlight_on', 'btn_flashlight_off', s.flashlight);
                         updateToggle('btn_vibrate_on', 'btn_vibrate_off', s.vibrating);
                         updateButton('btn_google_allow', 'btn_google_block', s.googleBlocked);
@@ -824,6 +845,8 @@
                 if (action === 'location_disable') updateButton('btn_location_allow', 'btn_location_block', params.disabled);
                 if (action === 'wifi_disable') updateButton('btn_wifi_allow', 'btn_wifi_block', params.disabled);
                 if (action === 'bluetooth_disable') updateButton('btn_bluetooth_allow', 'btn_bluetooth_block', params.disabled);
+                if (action === 'mobile_data_disable') updateButton('btn_mobile_allow', 'btn_mobile_block', params.disabled);
+                if (action === 'usb_data_disable') updateButton('btn_usb_allow', 'btn_usb_block', params.disabled);
                 if (action === 'flashlight') updateToggle('btn_flashlight_on', 'btn_flashlight_off', params.enabled);
                 if (action === 'vibrate') updateToggle('btn_vibrate_on', 'btn_vibrate_off', params.enabled);
                 if (action === 'google_services') updateButton('btn_google_allow', 'btn_google_block', params.block);
